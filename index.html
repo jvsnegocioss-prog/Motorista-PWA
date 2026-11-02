@@ -7,7 +7,7 @@
 <meta name="description" content="Controle seus ganhos, custos e metas como motorista de aplicativo.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
-<title>Projeto Motorista</title>
+<title>Projeto Motorista • v3</title>
 <style>
 :root{--bg:#101114;--panel:#1b1c21;--panel2:#24252c;--text:#f5f5f7;--muted:#a6a7b0;--orange:#ff4b18;--green:#15d66a;--red:#ff4d57;--yellow:#ffd447;--line:#34353d}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding-bottom:88px}
@@ -57,7 +57,14 @@ button.secondary,.action{border:1px solid var(--line);border-radius:11px;backgro
  </form>
  </div>
  <div id="tripResult" style="display:none;margin-top:12px" class="result"></div>
- <div class="card" style="margin-top:12px"><h3 style="margin-top:0">Ler captura de tela</h3><p class="note">Escolha uma imagem da oferta. Nesta primeira versão, a imagem fica no aparelho e você confere/digita os dados no formulário acima. O reconhecimento automático será uma etapa seguinte.</p><input type="file" id="offerImage" accept="image/*" capture="environment"><div id="imageStatus" class="note"></div></div>
+ <div class="card" style="margin-top:12px"><h3 style="margin-top:0">📷 Ler oferta pela captura de tela</h3>
+ <p class="note">Selecione uma captura salva em Fotos/Arquivos. O reconhecimento tenta identificar valor, quilômetros e minutos; confira tudo antes de calcular. A leitura depende da qualidade da imagem e pode errar.</p>
+ <input type="file" id="offerImage" accept="image/*">
+ <div id="imageStatus" class="note" aria-live="polite" style="margin-top:8px"></div>
+ <img id="offerPreview" alt="Prévia da captura selecionada" style="display:none;width:100%;max-height:280px;object-fit:contain;background:#09090a;border-radius:12px;margin-top:10px">
+ <button id="readOfferBtn" class="secondary" type="button" style="width:100%;margin-top:10px" disabled>Reconhecer texto da imagem</button>
+ <div id="ocrResults" style="display:none;margin-top:12px"><strong>Texto reconhecido (confira antes de usar)</strong><pre id="ocrText" style="white-space:pre-wrap;overflow-wrap:anywhere;background:#111216;border:1px solid var(--line);padding:10px;border-radius:10px;font-size:12px;max-height:180px;overflow:auto"></pre></div>
+ </div>
  <p class="note">A classificação é uma estimativa e não aceita nem recusa corridas automaticamente. Confira os dados antes de decidir.</p>
 </section>
 <section id="records" class="page">
@@ -115,6 +122,44 @@ $('incomeForm').onsubmit=e=>{e.preventDefault();data.incomes.push({platform:$('i
 $('expenseForm').onsubmit=e=>{e.preventDefault();data.expenses.push({category:$('expenseCategory').value,amount:+$('expenseAmount').value,desc:$('expenseDesc').value,date:$('expenseDate').value,created:Date.now()});e.target.reset();$('expenseDate').value=today();save();alert('Despesa salva.');};
 function activeVehicle(){return data.vehicles.find(v=>v.id===data.activeVehicleId)||data.vehicles[0];}
 function renderVehicles(){const sel=$('vehicleSelect');sel.innerHTML=data.vehicles.map(v=>`<option value="${esc(v.id)}">${esc(v.name)}</option>`).join('');sel.value=data.activeVehicleId;const v=activeVehicle();$('vehicleName').value=v.name;$('vehicleConsumption').value=v.consumption;$('vehicleFuelPrice').value=v.fuelPrice;$('vehicleMaintenance').value=v.maintenance;$('vehicleSummary').textContent=`Em uso: ${v.name} • ${v.consumption} km/L • combustível ${money(v.fuelPrice)}/L. A análise de corrida usa este veículo.`;}
+
+let selectedOfferImage=null;
+$('offerImage').onchange=()=>{
+ const file=$('offerImage').files&&$('offerImage').files[0];
+ selectedOfferImage=file||null;
+ $('readOfferBtn').disabled=!file;
+ $('ocrResults').style.display='none';
+ if(!file){$('offerPreview').style.display='none';$('imageStatus').textContent='';return;}
+ if(!file.type.startsWith('image/')){$('imageStatus').textContent='Escolha um arquivo de imagem.';$('readOfferBtn').disabled=true;return;}
+ const url=URL.createObjectURL(file);$('offerPreview').src=url;$('offerPreview').style.display='block';
+ $('imageStatus').textContent='Imagem carregada. Toque em “Reconhecer texto da imagem”.';
+};
+function parseBrazilNumber(s){s=String(s||'').trim().replace(/[^0-9.,]/g,'');if(!s)return NaN;if(s.includes(',')&&s.includes('.'))s=s.replace(/\./g,'').replace(',','.');else if(s.includes(','))s=s.replace(',','.');return Number(s);}
+$('readOfferBtn').onclick=async()=>{
+ if(!selectedOfferImage)return;
+ const btn=$('readOfferBtn');btn.disabled=true;$('imageStatus').textContent='Preparando o reconhecimento…';
+ try{
+  if(!window.Tesseract){
+   await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=resolve;s.onerror=()=>reject(new Error('Não foi possível carregar o mecanismo de leitura. Verifique a internet e tente novamente.'));document.head.appendChild(s);});
+  }
+  const result=await Tesseract.recognize(selectedOfferImage,'por+eng',{logger:m=>{
+   if(m.status==='recognizing text')$('imageStatus').textContent='Lendo a imagem… '+Math.round((m.progress||0)*100)+'%';
+   else if(m.status)$('imageStatus').textContent='Reconhecimento: '+m.status+'…';
+  }});
+  const text=result.data.text||'';$('ocrText').textContent=text||'Nenhum texto legível encontrado.';$('ocrResults').style.display='block';
+  const moneyMatches=[...text.matchAll(/R\s*\$\s*([0-9][0-9.,]*)/gi)].map(m=>parseBrazilNumber(m[1])).filter(n=>Number.isFinite(n)&&n>0);
+  const kmMatches=[...text.matchAll(/([0-9]+(?:[.,][0-9]+)?)\s*km\b/gi)].map(m=>parseBrazilNumber(m[1])).filter(n=>Number.isFinite(n)&&n>=0);
+  const minMatches=[...text.matchAll(/([0-9]+)\s*(?:min|minuto|minutos)\b/gi)].map(m=>Number(m[1])).filter(n=>Number.isFinite(n)&&n>0);
+  let found=[];
+  if(moneyMatches.length){$('fare').value=moneyMatches[0].toFixed(2);found.push('valor sugerido: '+money(moneyMatches[0]));}
+  if(kmMatches.length){$('pickupKm').value=kmMatches[0];if(kmMatches.length>1){$('tripKm').value=kmMatches[1];found.push('quilômetros sugeridos: '+kmMatches.slice(0,2).join(' e '));}else{ $('tripKm').value=kmMatches[0];found.push('quilômetros encontrados: '+kmMatches[0]);}}
+  if(minMatches.length){$('pickupMin').value=0;$('tripMin').value=minMatches.reduce((a,b)=>a+b,0);found.push('minutos encontrados: '+minMatches.join(' e '));}
+  if(/\b99\b/i.test(text))$('platform').value='99';else if(/indrive/i.test(text))$('platform').value='inDrive';else if(/uber/i.test(text))$('platform').value='Uber';
+  $('imageStatus').textContent=found.length?'Leitura concluída. '+found.join(' • ')+'. Confira e corrija os campos acima antes de calcular.':'Texto lido, mas não encontrei valores com confiança. Preencha os campos manualmente.';
+ }catch(err){$('imageStatus').textContent='Não foi possível ler a imagem: '+(err&&err.message?err.message:'erro inesperado')+' Você ainda pode preencher os dados manualmente.';}
+ finally{btn.disabled=false;btn.textContent='Reconhecer texto novamente';}
+};
+
 function fillSettings(){for(let k of ['goal','minKm','minHour','minProfit'])$(k).value=data.settings[k]??0;renderVehicles();}
 $('vehicleSelect').onchange=()=>{data.activeVehicleId=$('vehicleSelect').value;save();renderVehicles();};
 $('saveVehicleBtn').onclick=()=>{const v=activeVehicle();v.name=$('vehicleName').value.trim()||'Meu veículo';v.consumption=+$('vehicleConsumption').value;v.fuelPrice=+$('vehicleFuelPrice').value;v.maintenance=+$('vehicleMaintenance').value;if(v.consumption<=0){alert('Informe um consumo maior que zero.');return;}save();renderVehicles();alert('Veículo salvo.');};

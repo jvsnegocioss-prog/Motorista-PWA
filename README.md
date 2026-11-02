@@ -24,3 +24,9 @@ Protótipo v2 para controle de ganhos, despesas, metas, cadastro de múltiplos v
 - A estimativa não inclui automaticamente todos os custos fixos, impostos ou períodos sem passageiro.
 - Esta versão não se conecta às APIs de Uber, 99 ou inDrive e não aceita/recusa corridas automaticamente.
 - Antes de uso comercial, realizar testes, revisão de segurança, acessibilidade e compatibilidade.
+
+
+## Versão 3 — leitura de capturas
+- Permite escolher uma captura de tela da galeria/arquivos e tentar reconhecer texto usando Tesseract.js carregado pela internet.
+- Sugere valor, km e minutos quando consegue identificar os padrões; o motorista deve conferir os campos antes de calcular.
+- O reconhecimento não aceita nem recusa corridas e pode falhar em capturas de baixa qualidade. O formulário manual continua disponível.
