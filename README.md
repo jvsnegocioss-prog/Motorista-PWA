@@ -1,6 +1,6 @@
 # Projeto Motorista — protótipo PWA
 
-Protótipo inicial para controle de ganhos, despesas, metas e análise manual de ofertas para Uber, 99 e inDrive.
+Protótipo v2 para controle de ganhos, despesas, metas, cadastro de múltiplos veículos e análise manual de ofertas para Uber, 99 e inDrive.
 
 ## Arquivos
 - `index.html`: aplicativo
@@ -18,6 +18,7 @@ Protótipo inicial para controle de ganhos, despesas, metas e análise manual de
 ## Limitações desta versão
 - O nome é provisório; não é o nome comercial final.
 - A imagem da oferta pode ser selecionada, mas o OCR automático ainda não foi implementado.
+- É possível cadastrar vários veículos e selecionar qual está em uso; a análise utiliza consumo, combustível e manutenção do veículo selecionado.
 - A análise é baseada nos campos digitados e nos custos configurados.
 - Os dados ficam no armazenamento local do navegador/aparelho. Exportar backup regularmente; não há sincronização em nuvem nesta versão.
 - A estimativa não inclui automaticamente todos os custos fixos, impostos ou períodos sem passageiro.
